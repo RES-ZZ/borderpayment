@@ -2,16 +2,32 @@
 import { useState } from "react";
 import Input from "./Input";
 import Button from "./Button";
+import Alert from "./Alert"; // Assuming you have an Alert component for displaying errors
+import { auth } from "../../firebase"; // Import auth from your firebase.js file
+import { createUserWithEmailAndPassword } from "firebase/auth";
 
 const RegistrationForm = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState(null);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Registering user:", email, password);
-    setEmail("");
-    setPassword("");
+    if (!email || !password) {
+      setError("Please fill in all fields.");
+      return;
+    }
+
+    try {
+      // Use Firebase to register the user
+      await createUserWithEmailAndPassword(auth, email, password);
+      setError(null);
+      alert("Registration successful! You can now log in.");
+      setEmail("");
+      setPassword("");
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   return (
@@ -20,6 +36,7 @@ const RegistrationForm = () => {
         <h2 className="text-3xl font-bold mb-6 text-center text-gray-800">
           Register
         </h2>
+        {error && <Alert type="error" message={error} />}
         <form onSubmit={handleSubmit} className="space-y-6">
           <Input
             label="Email"

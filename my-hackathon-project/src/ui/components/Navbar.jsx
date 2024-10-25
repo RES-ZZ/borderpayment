@@ -1,36 +1,43 @@
+// src/ui/components/NavBar.jsx
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth } from "../../firebase";
 import { Link } from "react-router-dom";
+import SignOutButton from "./SignOutButton"; // Import the SignOutButton component
 
-const Navbar = () => {
+const NavBar = () => {
+  const [user, loading] = useAuthState(auth);
+
   return (
-    <nav className="bg-white p-0 shadow-md">
-      {" "}
-      {/* Increased padding from p-6 to p-8 */}
-      <div className="max-w-screen-xl mx-auto flex items-center justify-between">
-        <Link
-          to="/"
-          className="text-blue-600 font-semibold text-lg pl-2 hover:text-blue-800 mt-12"
-        >
+    <nav className="bg-gray-800 p-4 flex justify-between items-center">
+      <div>
+        <Link to="/" className="text-white text-lg">
           Home
         </Link>
-        <div className="flex space-x-4 mt-10">
-          {" "}
-          {/* Increased margin-top from mt-2 to mt-4 */}
-          <Link
-            to="/register"
-            className="text-blue-600 px-4 py-2 mb-2 mt-12 mr border border-blue-600 rounded hover:bg-blue-600 hover:text-white transition duration-300"
-          >
-            Register
+        {user && (
+          <Link to="/payments" className="ml-4 text-white text-lg">
+            Payments
           </Link>
+        )}
+      </div>
+      <div>
+        {loading ? (
+          <div className="text-gray-300">Loading...</div>
+        ) : user ? (
+          <>
+            <span className="text-white mr-4">Welcome, {user.email}!</span>
+            <SignOutButton />
+          </>
+        ) : (
           <Link
             to="/login"
-            className="text-blue-600 px-4 py-3 mt-12 border border-blue-600 rounded hover:bg-blue-600 hover:text-white transition duration-300"
+            className="bg-blue-500 text-white px-4 py-2 rounded"
           >
             Login
           </Link>
-        </div>
+        )}
       </div>
     </nav>
   );
 };
 
-export default Navbar;
+export default NavBar;

@@ -1,23 +1,33 @@
+// src/ui/components/LoginForm.jsx
 import { useState } from "react";
 import Input from "./Input";
 import Button from "./Button";
 import Alert from "./Alert";
+import { auth } from "../../firebase"; // Import auth from your firebase.js file
+import { signInWithEmailAndPassword } from "firebase/auth";
 
 const LoginForm = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email || !password) {
       setError("Please fill in all fields.");
       return;
     }
-    console.log("Logging in user:", email, password);
-    setError(null);
-    setEmail("");
-    setPassword("");
+
+    try {
+      // Use Firebase to sign in the user
+      await signInWithEmailAndPassword(auth, email, password);
+      setError(null);
+      alert("Login successful!");
+      setEmail("");
+      setPassword("");
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   return (
