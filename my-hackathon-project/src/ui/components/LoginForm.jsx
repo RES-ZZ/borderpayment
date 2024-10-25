@@ -1,4 +1,3 @@
-// src/ui/components/LoginForm.jsx
 import { useState } from "react";
 import Input from "./Input";
 import Button from "./Button";
@@ -11,25 +10,25 @@ const LoginForm = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Handle login logic (e.g., Firebase Authentication)
     if (!email || !password) {
       setError("Please fill in all fields.");
       return;
     }
     console.log("Logging in user:", email, password);
     setError(null);
-    // Reset form
     setEmail("");
     setPassword("");
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+    <div className="h-screen w-screen flex items-center justify-center bg-black">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-md bg-white p-8 rounded-lg shadow-md"
+        className="w-full max-w-lg mx-auto bg-gray-900 p-8 rounded-lg shadow-md text-white"
       >
-        <h2 className="text-2xl font-semibold mb-6 text-center">Login</h2>
+        <h2 className="text-3xl font-semibold mb-6 text-center text-white">
+          Login
+        </h2>
         {error && <Alert type="error" message={error} />}
         <Input
           label="Email"
@@ -38,6 +37,7 @@ const LoginForm = () => {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
           required
+          className="bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white mb-4"
         />
         <Input
           label="Password"
@@ -46,8 +46,13 @@ const LoginForm = () => {
           onChange={(e) => setPassword(e.target.value)}
           placeholder="********"
           required
+          className="bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white mb-4"
         />
-        <Button type="submit" variant="primary" className="w-full mt-4">
+        <Button
+          type="submit"
+          variant="primary"
+          className="w-full mt-4 bg-white text-black hover:bg-gray-200"
+        >
           Login
         </Button>
       </form>
