@@ -1,23 +1,26 @@
 // src/ui/components/Alert.jsx
-import PropTypes from "prop-types";
-import { cn } from "../../lib/util";
 
-const Alert = ({ type = "info", message }) => {
-  const typeStyles = {
-    success: "bg-green-100 text-green-700",
-    error: "bg-red-100 text-red-700",
-    warning: "bg-yellow-100 text-yellow-700",
-    info: "bg-blue-100 text-blue-700",
+import PropTypes from "prop-types";
+
+const Alert = ({ type, message }) => {
+  Alert.propTypes = {
+    type: PropTypes.string.isRequired,
+    message: PropTypes.string.isRequired,
   };
 
-  return (
-    <div className={cn("p-4 mb-4 rounded-md", typeStyles[type])}>{message}</div>
-  );
-};
+  const baseStyle = "p-4 mb-4 text-sm rounded-lg";
+  const typeStyle =
+    type === "error"
+      ? "text-red-700 bg-red-100"
+      : type === "success"
+      ? "text-green-700 bg-green-100"
+      : "text-gray-700 bg-gray-100";
 
-Alert.propTypes = {
-  type: PropTypes.oneOf(["success", "error", "warning", "info"]),
-  message: PropTypes.string.isRequired,
+  return (
+    <div className={`${baseStyle} ${typeStyle}`} role="alert">
+      {message}
+    </div>
+  );
 };
 
 export default Alert;

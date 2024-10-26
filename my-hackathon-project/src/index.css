@@ -78,3 +78,39 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+.stars-background {
+  background: radial-gradient(ellipse at bottom, #1a0b2e 0%, #090a0f 100%);
+}
+
+@keyframes animStar {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-2000px);
+  }
+}
+
+.stars {
+  width: 1px;
+  height: 1px;
+  background: transparent;
+  box-shadow: 1744px 122px #fff, 134px 1321px #fff, 1882px 812px #fff;
+  animation: animStar 50s linear infinite;
+}
+
+.stars2 {
+  width: 2px;
+  height: 2px;
+  background: transparent;
+  box-shadow: 1744px 122px #fff, 134px 1321px #fff, 1882px 812px #fff;
+  animation: animStar 100s linear infinite;
+}
+
+.stars3 {
+  width: 3px;
+  height: 3px;
+  background: transparent;
+  box-shadow: 1744px 122px #fff, 134px 1321px #fff, 1882px 812px #fff;
+  animation: animStar 150s linear infinite;
+}
