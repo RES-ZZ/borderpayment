@@ -1,5 +1,6 @@
 // src/ui/components/LoginForm.jsx
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Input from "./Input";
 import Button from "./Button";
 import Alert from "./Alert";
@@ -167,6 +168,7 @@ const contractABI = [
 const contractAddress = "0x987904bE3875FD0034a257777a68D20C286F4801";
 
 const LoginForm = () => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
@@ -220,6 +222,10 @@ const LoginForm = () => {
       if (isValid) {
         setSuccessMessage("Signature verified successfully!");
         console.log("Signature is valid!");
+        // Automatically submit the form if email and password are filled
+        if (email && password) {
+          handleSubmit(new Event("submit"));
+        }
       } else {
         setError("Invalid signature!");
         console.log("Signature is invalid!");
@@ -241,9 +247,14 @@ const LoginForm = () => {
       // Use Firebase to sign in the user
       await signInWithEmailAndPassword(auth, email, password);
       setError(null);
-      alert("Login successful!");
-      setEmail("");
-      setPassword("");
+
+      // Check if wallet validation was successful
+      if (successMessage && successMessage.includes("verified")) {
+        // Navigate to payment page immediately after successful login
+        navigate("/payment");
+      } else {
+        setError("Please validate your wallet before proceeding");
+      }
     } catch (err) {
       setError(err.message);
     }
@@ -289,7 +300,7 @@ const LoginForm = () => {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               required
-              className="w-full p-3 bg-blue-50 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200 placeholder-gray-400"
+              className="w-full p-3 text-blue-950 bg-blue-50 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200 placeholder-gray-400"
             />
           </div>
 
@@ -301,7 +312,7 @@ const LoginForm = () => {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="********"
               required
-              className="w-full p-3 bg-blue-50 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200 placeholder-gray-400"
+              className="w-full p-3 text-blue-950 bg-blue-50 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200 placeholder-gray-400"
             />
           </div>
 
@@ -313,14 +324,14 @@ const LoginForm = () => {
             <Button
               type="button"
               onClick={validateSignatureOnChain}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-blue-600 text-blue-950 hover:bg-blue-700 py-3 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Validate Wallet
             </Button>
 
             {account && (
               <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-                <p className="text-sm text-gray-600 break-all">
+                <p className="text-sm text-blue-950 text-gray-600 break-all">
                   <span className="font-medium">Connected Wallet:</span>
                   <br />
                   {account}
@@ -332,7 +343,7 @@ const LoginForm = () => {
           <Button
             type="submit"
             variant="primary"
-            className="w-full bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-50 py-3 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg mt-4"
+            className="w-full text-blue-950 border-2 border-blue-600 hover:text-blue-600 py-3 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg mt-4"
           >
             Sign In
           </Button>

@@ -62,7 +62,7 @@ const NavBar = () => {
           className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center"
         >
           {/* Logo and Navigation */}
-          <div className="flex  mt-13 items-center space-x-6">
+          <div className="flex mt-13 items-center space-x-6">
             <motion.div whileHover={{ scale: 1.05 }}>
               <Link
                 to="/"
@@ -72,14 +72,24 @@ const NavBar = () => {
               </Link>
             </motion.div>
             {user && (
-              <motion.div whileHover={{ scale: 1.05 }}>
-                <Link
-                  to="/payments"
-                  className="text-lg font-semibold text-purple-100 hover:text-white transition-colors"
-                >
-                  Payments
-                </Link>
-              </motion.div>
+              <>
+                <motion.div whileHover={{ scale: 1.05 }}>
+                  <Link
+                    to="/payments"
+                    className="text-lg font-semibold text-purple-100 hover:text-white transition-colors"
+                  >
+                    Payments
+                  </Link>
+                </motion.div>
+                <motion.div whileHover={{ scale: 1.05 }}>
+                  <Link
+                    to="/history"
+                    className="text-lg font-semibold text-purple-100 hover:text-white transition-colors"
+                  >
+                    Transaction History
+                  </Link>
+                </motion.div>
+              </>
             )}
           </div>
 

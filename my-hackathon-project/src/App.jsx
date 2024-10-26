@@ -5,6 +5,7 @@ import LoginForm from "./ui/components/LoginForm"; // Assuming you have a LoginF
 import Home from "./ui/components/Home"; // Assuming you have a Home component
 import PaymentPage from "./ui/components/PaymentPage"; // Assuming you have a PaymentPage component
 import ProtectedRoute from "./ui/components/ProtectedRoute"; // Assuming you have a ProtectedRoute component
+import PaymentHistory from "./ui/components/PaymentHistory";
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/register" element={<RegistrationForm />} />
         <Route path="/login" element={<LoginForm />} />
+        <Route path="/history" element={<PaymentHistory />} />
         <Route
           path="/payments"
           element={

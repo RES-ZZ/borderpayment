@@ -10,6 +10,12 @@ import {
   FiArrowUpRight,
   FiArrowDownLeft,
 } from "react-icons/fi";
+import { db } from "../../firebase"; // Make sure you have this configured
+import { collection, addDoc } from "firebase/firestore";
+import { PDFDocument, rgb } from "pdf-lib";
+import { FiDownload } from "react-icons/fi";
+import { analyzeUserTransactionPattern } from "../../fraudAnalysis/fraudAnalysis";
+import { testFraudDetection } from "../../utils/testFraudScenarios";
 
 const CELO_ALFAJORES_PARAMS = {
   chainId: "0xaef3", // 44787 in hex
@@ -44,16 +50,89 @@ const PaymentPage = () => {
       console.error("Failed to copy:", err);
     }
   };
+  const generateBlockchainUUID = async (web3Instance, account) => {
+    const timestamp = Date.now().toString();
+    const message = `${account}-${timestamp}`;
+    const hash = web3Instance.utils.sha3(message);
+    return hash.substring(2, 38); // Take a portion of the hash as UUID
+  };
 
-  const generateReceipt = (txHash, amount) => {
-    return {
-      id: uuidv4(),
+  const generateReceipt = async (
+    txHash,
+    amount,
+    blockchainUUID,
+    fraudAnalysis
+  ) => {
+    const receipt = {
+      id: blockchainUUID,
       timestamp: new Date().toISOString(),
       txHash,
       amount,
-      recipient: recipientUsername || recipient,
+      senderUsername: "Your Username",
+      senderAddress: account,
+      recipientUsername: recipientUsername || "Unknown",
+      recipientAddress: recipient,
+      recipientEmail: "recipient@email.com",
       type: paymentMode,
+      status: "completed",
+      riskAnalysis: {
+        level: fraudAnalysis.riskLevel,
+        score: fraudAnalysis.riskScore,
+        anomalies: fraudAnalysis.anomalies,
+        timestamp: new Date().toISOString(),
+      },
     };
+
+    try {
+      const docRef = await addDoc(collection(db, "transactions"), receipt);
+      console.log("Transaction stored with ID: ", docRef.id);
+    } catch (error) {
+      console.error("Error storing transaction:", error);
+    }
+
+    return receipt;
+  };
+  const generatePDF = async (receiptData) => {
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([550, 750]);
+    const { width, height } = page.getSize();
+
+    page.drawText("Payment Receipt", {
+      x: 50,
+      y: height - 50,
+      size: 20,
+      color: rgb(0, 0, 0),
+    });
+
+    const details = [
+      `Transaction ID: ${receiptData.id}`,
+      `Amount: ${receiptData.amount} CELO`,
+      `Recipient: ${receiptData.recipient}`,
+      `Date: ${new Date(receiptData.timestamp).toLocaleString()}`,
+      `Status: ${receiptData.status}`,
+      receiptData.txHash ? `Transaction Hash: ${receiptData.txHash}` : "",
+    ];
+
+    details.forEach((detail, index) => {
+      page.drawText(detail, {
+        x: 50,
+        y: height - 100 - index * 30,
+        size: 12,
+        color: rgb(0, 0, 0),
+      });
+    });
+
+    const pdfBytes = await pdfDoc.save();
+    const blob = new Blob([pdfBytes], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `receipt-${receiptData.id}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const switchToCeloAlfajores = async () => {
@@ -84,18 +163,44 @@ const PaymentPage = () => {
     setLoading(true);
 
     try {
-      if (paymentMode === "request") {
-        // Handle payment request logic here
-        const newReceipt = generateReceipt("request-" + uuidv4(), amount);
-        setReceipt(newReceipt);
-        setLoading(false);
-        return;
+      // Prepare transaction data
+      const transactionData = {
+        amount,
+        recipient,
+        senderAddress: account,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Perform fraud analysis
+      const fraudAnalysis = await analyzeUserTransactionPattern(
+        account,
+        transactionData
+      );
+
+      // Handle high-risk transactions
+      if (fraudAnalysis.riskLevel === "HIGH") {
+        const proceed = window.confirm(
+          `⚠️ High-risk transaction detected:\n\n${fraudAnalysis.anomalies.join(
+            "\n"
+          )}\n\nRecommendations:\n${fraudAnalysis.recommendations.join(
+            "\n"
+          )}\n\nDo you want to proceed?`
+        );
+        if (!proceed) {
+          throw new Error("Transaction cancelled due to high risk");
+        }
       }
 
-      if (!window.ethereum) {
-        throw new Error("Please install MetaMask");
+      // Handle medium-risk transactions
+      if (fraudAnalysis.riskLevel === "MEDIUM") {
+        alert(
+          `⚠️ Warning:\n\n${fraudAnalysis.anomalies.join(
+            "\n"
+          )}\n\nPlease review carefully.`
+        );
       }
 
+      // Continue with existing payment logic
       await switchToCeloAlfajores();
       const web3Instance = new Web3(window.ethereum);
       const accounts = await web3Instance.eth.getAccounts();
@@ -104,7 +209,12 @@ const PaymentPage = () => {
         throw new Error("Please connect your wallet");
       }
 
+      const blockchainUUID = await generateBlockchainUUID(
+        web3Instance,
+        accounts[0]
+      );
       const amountWei = web3Instance.utils.toWei(amount, "ether");
+
       const tx = await web3Instance.eth.sendTransaction({
         from: accounts[0],
         to: recipient,
@@ -113,8 +223,15 @@ const PaymentPage = () => {
         gasPrice: await web3Instance.eth.getGasPrice(),
       });
 
+      // Include fraud analysis in receipt
+      const newReceipt = await generateReceipt(
+        tx.transactionHash,
+        amount,
+        blockchainUUID,
+        fraudAnalysis
+      );
+
       setTxHash(tx.transactionHash);
-      const newReceipt = generateReceipt(tx.transactionHash, amount);
       setReceipt(newReceipt);
       setRecipient("");
       setRecipientUsername("");
@@ -246,41 +363,78 @@ const PaymentPage = () => {
                   ? "Payment Requested!"
                   : "Payment Sent!"}
               </h3>
-              <div className="space-y-2 text-sm text-gray-600">
-                <p>Receipt ID: {receipt.id.slice(0, 8)}</p>
-                <p>Amount: {receipt.amount} CELO</p>
-                <p>
-                  {receipt.type === "request" ? "From" : "To"}:{" "}
-                  {receipt.username || receipt.to}
-                </p>
-                <p>Date: {new Date(receipt.timestamp).toLocaleString()}</p>
-                {receipt.message && <p className="italic">{receipt.message}</p>}
+              <div className="space-y-3 text-sm text-gray-600 bg-gray-50 p-4 rounded-lg">
+                <div className="flex justify-between items-center border-b border-gray-200 pb-2">
+                  <span className="font-medium">Receipt ID:</span>
+                  <span className="font-mono">{receipt.id.slice(0, 8)}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-gray-200 pb-2">
+                  <span className=" text-black font-medium">Amount:</span>
+                  <span className="text-green-600 font-bold">
+                    {receipt.amount} CELO
+                  </span>
+                </div>
+                <div className="flex justify-between items-center border-b border-gray-200 pb-2">
+                  <span className="font-medium">
+                    {receipt.type === "request" ? "From" : "To"}:
+                  </span>
+                  <span className="font-mono">
+                    {receipt.username || receipt.to}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center border-b border-gray-200 pb-2">
+                  <span className="font-medium">Date:</span>
+                  <span>{new Date(receipt.timestamp).toLocaleString()}</span>
+                </div>
+                {receipt.message && (
+                  <div className="border-b border-gray-200 pb-2">
+                    <p className="italic text-left">{receipt.message}</p>
+                  </div>
+                )}
                 {receipt.txHash && (
-                  <a
-                    href={`https://alfajores.celoscan.io/tx/${receipt.txHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-500 hover:underline block"
-                  >
-                    View on Explorer
-                  </a>
+                  <div className="pt-2">
+                    <a
+                      href={`https://alfajores.celoscan.io/tx/${receipt.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-500 hover:underline flex items-center justify-center gap-2"
+                    >
+                      <span>View on Explorer</span>
+                      <FiArrowUpRight className="w-4 h-4" />
+                    </a>
+                  </div>
                 )}
               </div>
-              <button
-                onClick={() => {
-                  setReceipt(null);
-                  setTxHash(null);
-                }}
-                className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                New Transaction
-              </button>
+
+              <div className="flex gap-3 justify-center mt-6">
+                <button
+                  onClick={() => generatePDF(receipt)}
+                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                >
+                  <FiDownload className="w-5 h-5" />
+                  Download Receipt
+                </button>
+                <button
+                  onClick={() => {
+                    setReceipt(null);
+                    setTxHash(null);
+                  }}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                >
+                  <FiArrowUpRight className="w-5 h-5" />
+                  New Transaction
+                </button>
+              </div>
+
+              <div className="mt-4 text-xs text-gray-500">
+                Transaction ID stored on blockchain and Firebase
+              </div>
             </div>
           </motion.div>
         ) : (
           <form onSubmit={handlePayment} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <label className="block text-sm text-black font-medium mb-2">
                 Recipient Address
               </label>
               <input
@@ -294,7 +448,7 @@ const PaymentPage = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <label className="block text-sm text-black font-medium mb-2">
                 Amount (CELO)
               </label>
               <input
@@ -340,6 +494,72 @@ const PaymentPage = () => {
         )}
 
         {showRequestModal && <RequestModal />}
+
+        {!receipt && (
+          <div className=" border-spacing-5 border-gray-200 mt-6 flex gap-3">
+            <button
+              onClick={async () => {
+                try {
+                  const testTransaction = {
+                    amount: "1000", // Unusually high amount
+                    recipient: "0x123...", // New recipient
+                    senderAddress: account,
+                    timestamp: new Date().toISOString(),
+                  };
+
+                  const fraudAnalysis = await analyzeUserTransactionPattern(
+                    account,
+                    testTransaction
+                  );
+
+                  console.log("Fraud Analysis Result:", fraudAnalysis);
+                  alert(
+                    `Risk Level: ${fraudAnalysis.riskLevel}\n` +
+                      `Risk Score: ${fraudAnalysis.riskScore}\n` +
+                      `Anomalies: ${fraudAnalysis.anomalies.join("\n")}\n` +
+                      `Recommendations: ${fraudAnalysis.recommendations.join(
+                        "\n"
+                      )}`
+                  );
+                } catch (error) {
+                  console.error("Test failed:", error);
+                  alert("Test failed: " + error.message);
+                }
+              }}
+              className="mb-6 w-full py-2 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200"
+            >
+              Test Fraud Detection
+            </button>
+          </div>
+        )}
+        <div className=" blockflex gap-3">
+          <button
+            onClick={async () => {
+              try {
+                const results = await testFraudDetection();
+                console.table(results);
+
+                const summary = results
+                  .map(
+                    (r) =>
+                      `${r.scenario}: ${r.passed ? "✅" : "❌"}\n` +
+                      `Expected: ${r.expected}\n` +
+                      `Received: ${r.received}\n` +
+                      `${r.error ? "Error: " + r.error : ""}\n`
+                  )
+                  .join("\n");
+
+                alert(`Test Results:\n\n${summary}`);
+              } catch (error) {
+                console.error("Test suite failed:", error);
+                alert("Test suite failed: " + error.message);
+              }
+            }}
+            className="mb-6 w-full py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200"
+          >
+            Run All Fraud Detection Tests
+          </button>
+        </div>
       </div>
     </div>
   );
