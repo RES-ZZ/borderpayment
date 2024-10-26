@@ -48,13 +48,13 @@ const NavBar = () => {
   return (
     <div className="relative">
       {/* Starry Background */}
-      <div className="absolute inset-0 mt-13 h-[80px] bg-[#1a0b2e] overflow-hidden stars-background">
+      <div className="absolute inset-0 mt-13 overflow-hidden stars-background">
         <div className="stars"></div>
         <div className="stars2"></div>
         <div className="stars3"></div>
       </div>
 
-      <nav className="relative bg-gradient-to-r mt-16 from-purple-900/90 via-purple-800/90 to-purple-900/90 backdrop-blur-sm border-b border-purple-700/30">
+      <nav className="relative bg-gradient-to-r mt-20 bg-blue-200">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -66,7 +66,7 @@ const NavBar = () => {
             <motion.div whileHover={{ scale: 1.05 }}>
               <Link
                 to="/"
-                className="text-lg font-semibold text-purple-100 hover:text-white transition-colors"
+                className="text-lg font-semibold text-black hover:text-blue transition-colors"
               >
                 Home
               </Link>
@@ -76,7 +76,7 @@ const NavBar = () => {
                 <motion.div whileHover={{ scale: 1.05 }}>
                   <Link
                     to="/payments"
-                    className="text-lg font-semibold text-purple-100 hover:text-white transition-colors"
+                    className="text-lg font-semibold text-black hover:text-blue transition-colors"
                   >
                     Payments
                   </Link>
@@ -84,7 +84,7 @@ const NavBar = () => {
                 <motion.div whileHover={{ scale: 1.05 }}>
                   <Link
                     to="/history"
-                    className="text-lg font-semibold text-purple-100 hover:text-white transition-colors"
+                    className="text-lg font-semibold text-black hover:text-blue transition-colors"
                   >
                     Transaction History
                   </Link>
@@ -102,9 +102,7 @@ const NavBar = () => {
                 animate={{ opacity: 1 }}
                 className="px-4 py-2 bg-purple-800/50 rounded-lg border border-purple-600/30"
               >
-                <span className="text-purple-100">
-                  {shortenAddress(account)}
-                </span>
+                <span className="text-black">{shortenAddress(account)}</span>
               </motion.div>
             ) : (
               <motion.button
@@ -119,10 +117,10 @@ const NavBar = () => {
 
             {/* Auth Status */}
             {loading ? (
-              <div className="text-purple-100 animate-pulse">Loading...</div>
+              <div className="text-black animate-pulse">Loading...</div>
             ) : user ? (
-              <div className="flex items-center space-x-4">
-                <span className="text-purple-100">{user.email}</span>
+              <div className="flex items-center hover:bg-blue space-x-4">
+                <span className="text-black hover:bg-blue">{user.email}</span>
                 <SignOutButton />
               </div>
             ) : (

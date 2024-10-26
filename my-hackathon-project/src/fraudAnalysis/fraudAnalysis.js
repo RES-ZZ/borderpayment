@@ -4,88 +4,55 @@ import { db } from "../firebase";
 const GROQ_API_KEY = "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";
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
-export const analyzeUserTransactionPattern = async (userId, newTransaction) => {
+export const analyzeUserTransactionPattern = async (account, transactionData) => {
     try {
-        // Fetch user's transaction history
-        const q = query(
-            collection(db, "transactions"),
-            where("senderAddress", "==", newTransaction.senderAddress),
-            orderBy("timestamp", "desc"),
-            limit(10)
-        );
+        // Basic fraud analysis implementation
+        const { amount } = transactionData;
+        const amountNum = parseFloat(amount);
 
-        const querySnapshot = await getDocs(q);
-        const transactionHistory = querySnapshot.docs.map(doc => ({
-            ...doc.data(),
-            id: doc.id
-        }));
+        let riskLevel = "LOW";
+        let riskScore = 0;
+        const anomalies = [];
+        const recommendations = [];
 
-        // Prepare data for analysis
-        const analysisData = {
-            newTransaction: {
-                amount: newTransaction.amount,
-                recipient: newTransaction.recipient,
-                timestamp: new Date().toISOString(),
-            },
-            historicalTransactions: transactionHistory,
-            patterns: {
-                averageAmount: calculateAverageAmount(transactionHistory),
-                frequentRecipients: getFrequentRecipients(transactionHistory),
-                timePatterns: analyzeTimePatterns(transactionHistory),
-            }
-        };
+        // Check for high-value transactions
+        if (amountNum > 1000) {
+            riskLevel = "HIGH";
+            riskScore += 50;
+            anomalies.push("Unusually high transaction amount");
+            recommendations.push("Consider splitting into multiple smaller transactions");
+        }
 
-        // Send to GROQ for analysis
-        const response = await fetch(GROQ_API_URL, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${GROQ_API_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: "mixtral-8x7b-32768",
-                messages: [
-                    {
-                        role: "system",
-                        content: "You are a fraud detection expert analyzing cryptocurrency transactions. Analyze the transaction patterns and identify potential fraud indicators."
-                    },
-                    {
-                        role: "user",
-                        content: `Analyze this transaction and history for fraud:
-              ${JSON.stringify(analysisData, null, 2)}
-              
-              Consider:
-              1. Unusual amount patterns
-              2. Transaction frequency anomalies
-              3. New recipient risk
-              4. Time-based patterns
-              5. Historical behavior consistency
-              
-              Return a JSON with:
-              {
-                riskLevel: "LOW"|"MEDIUM"|"HIGH",
-                riskScore: <number between 0-100>,
-                anomalies: [],
-                recommendations: [],
-                requiresManualReview: boolean
-              }`
-                    }
-                ],
-                temperature: 0.2,
-                max_tokens: 1000
-            })
-        });
+        // Check for odd hours transactions (if between 11 PM and 5 AM)
+        const hour = new Date().getHours();
+        if (hour >= 23 || hour <= 5) {
+            riskScore += 20;
+            anomalies.push("Transaction attempted during unusual hours");
+            recommendations.push("Consider conducting transactions during regular business hours");
+        }
 
-        const result = await response.json();
-        return JSON.parse(result.choices[0].message.content);
-    } catch (error) {
-        console.error("Fraud analysis error:", error);
+        // Adjust risk level based on score
+        if (riskScore >= 50) {
+            riskLevel = "HIGH";
+        } else if (riskScore >= 20) {
+            riskLevel = "MEDIUM";
+        }
+
         return {
-            riskLevel: "ERROR",
-            riskScore: 100,
-            anomalies: ["Failed to perform analysis"],
-            recommendations: ["Manual review required"],
-            requiresManualReview: true
+            riskLevel,
+            riskScore,
+            anomalies,
+            recommendations,
+            timestamp: new Date().toISOString()
+        };
+    } catch (error) {
+        console.error("Error in fraud analysis:", error);
+        return {
+            riskLevel: "LOW",
+            riskScore: 0,
+            anomalies: [],
+            recommendations: [],
+            timestamp: new Date().toISOString()
         };
     }
 };
