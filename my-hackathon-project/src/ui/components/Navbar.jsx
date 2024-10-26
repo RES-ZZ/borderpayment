@@ -62,7 +62,7 @@ const NavBar = () => {
           className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center"
         >
           {/* Logo and Navigation */}
-          <div className="flex mt-13 items-center space-x-6">
+          <div className="flex mt-1 items-center space-x-6">
             <motion.div whileHover={{ scale: 1.05 }}>
               <Link
                 to="/"

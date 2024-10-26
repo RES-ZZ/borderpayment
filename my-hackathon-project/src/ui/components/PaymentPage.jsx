@@ -1,4 +1,4 @@
-import { useState, useContext, useEffect } from "react";
+import { useState, useContext, useEffect, useRef } from "react";
 import { Web3Context } from "../../context/Web3Context";
 import { motion } from "framer-motion";
 import Web3 from "web3";
@@ -20,6 +20,7 @@ import { analyzeUserTransactionPattern } from "../../fraudAnalysis/fraudAnalysis
 import { testFraudDetection } from "../../utils/testFraudScenarios";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import PropTypes from "prop-types";
+import { predictPriceFromImage } from "../../utils/visionPredictor";
 
 const CELO_ALFAJORES_PARAMS = {
   chainId: "0xaef3", // 44787 in hex
@@ -1019,6 +1020,147 @@ const PriceTrackingForm = ({
   analysisResult,
   loading,
 }) => {
+  const [showCamera, setShowCamera] = useState(false);
+  const [prediction, setPrediction] = useState(null);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+
+  // Move useEffect inside the component before the return statement
+  useEffect(() => {
+    let mounted = true;
+
+    if (showCamera) {
+      const startCamera = async () => {
+        try {
+          const constraints = {
+            video: {
+              facingMode: "environment",
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+          };
+
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+          if (mounted && videoRef.current) {
+            videoRef.current.srcObject = stream;
+            streamRef.current = stream;
+
+            // Wait for video to be loaded
+            await new Promise((resolve) => {
+              videoRef.current.onloadedmetadata = resolve;
+            });
+
+            // Start playing the video
+            await videoRef.current.play();
+          }
+        } catch (error) {
+          console.error("Camera access error:", error);
+          alert(
+            "Could not access camera: " + (error.message || "Unknown error")
+          );
+          if (mounted) {
+            setShowCamera(false);
+          }
+        }
+      };
+
+      startCamera();
+    }
+
+    return () => {
+      mounted = false;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [showCamera]);
+
+  const handleCapture = async () => {
+    if (!videoRef.current || !videoRef.current.srcObject) {
+      console.error("Video stream not available");
+      return;
+    }
+
+    try {
+      // Wait for video to be ready
+      await new Promise((resolve) => {
+        if (videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+          resolve();
+        } else {
+          videoRef.current.addEventListener("loadeddata", resolve, {
+            once: true,
+          });
+        }
+      });
+
+      const canvas = document.createElement("canvas");
+      const video = videoRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      const context = canvas.getContext("2d");
+      if (!context) {
+        throw new Error("Could not get canvas context");
+      }
+
+      // Draw the video frame to canvas
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Convert to blob
+      canvas.toBlob(
+        async (blob) => {
+          if (!blob) {
+            throw new Error("Failed to create image blob");
+          }
+
+          try {
+            // Stop camera stream
+            if (streamRef.current) {
+              streamRef.current.getTracks().forEach((track) => track.stop());
+            }
+            setShowCamera(false);
+
+            // Show loading state
+            setPrediction({ loading: true });
+
+            // Call prediction API
+            const result = await predictPriceFromImage(blob);
+            console.log("Prediction result:", result);
+
+            // Update prediction state
+            setPrediction({
+              predictedPrice: result.predictedPrice || 0,
+              itemName: result.itemName || "Unknown Item",
+              confidence: result.confidence || 0,
+              error: result.error,
+            });
+          } catch (error) {
+            console.error("Prediction error:", error);
+            setPrediction({
+              error:
+                "Failed to predict price: " +
+                (error.message || "Unknown error"),
+              predictedPrice: 0,
+              itemName: "Error",
+              confidence: 0,
+            });
+          }
+        },
+        "image/jpeg",
+        0.8
+      );
+    } catch (error) {
+      console.error("Camera capture error:", error);
+      setPrediction({
+        error: "Failed to capture image: " + (error.message || "Unknown error"),
+        predictedPrice: 0,
+        itemName: "Error",
+        confidence: 0,
+      });
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault(); // Prevent form submission refresh
     submitPriceData();
@@ -1110,6 +1252,96 @@ const PriceTrackingForm = ({
           "Submit Price Information"
         )}
       </button>
+
+      {/* Add Price Prediction Button */}
+      <div className="mb-6">
+        <button
+          type="button"
+          onClick={() => setShowCamera(true)}
+          className="w-full py-3 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-md"
+        >
+          <FiCamera className="w-5 h-5" />
+          Check Price with Camera
+        </button>
+
+        {/* Camera Modal */}
+        {showCamera && (
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-4 max-w-lg w-full">
+              <div className="relative">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  className="w-full rounded-lg"
+                />
+                <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-4">
+                  <button
+                    type="button"
+                    onClick={handleCapture}
+                    className="px-6 py-2 bg-green-500 text-white rounded-full hover:bg-green-600 flex items-center gap-2"
+                  >
+                    <FiCamera className="w-4 h-4" />
+                    Capture & Predict
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (streamRef.current) {
+                        streamRef.current
+                          .getTracks()
+                          .forEach((track) => track.stop());
+                      }
+                      setShowCamera(false);
+                    }}
+                    className="px-6 py-2 bg-red-500 text-white rounded-full hover:bg-red-600"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Prediction Results */}
+        {prediction && (
+          <div className="mt-4 p-4 bg-purple-50 rounded-lg border border-purple-100">
+            <h4 className="font-medium text-purple-800 mb-2">
+              AI Price Prediction
+            </h4>
+            {prediction.loading ? (
+              <div className="flex items-center justify-center py-4">
+                <div className="w-6 h-6 border-2 border-purple-600 rounded-full animate-spin border-t-transparent"></div>
+                <span className="ml-2 text-purple-600">Analyzing image...</span>
+              </div>
+            ) : prediction.error ? (
+              <div className="text-red-600 text-sm ">{prediction.error}</div>
+            ) : (
+              <div className="space-y-2 text-sm">
+                <p className="flex justify-between">
+                  <span className="text-gray-600">Item:</span>
+                  <span className="font-medium text-black">
+                    {prediction.itemName}
+                  </span>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-gray-600">Estimated Price:</span>
+                  <span className="font-medium text-black">
+                    ₹{prediction.predictedPrice}
+                  </span>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-gray-600">Confidence:</span>
+                  <span className="font-medium text-black">
+                    {prediction.confidence}%
+                  </span>
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </form>
   );
 };
